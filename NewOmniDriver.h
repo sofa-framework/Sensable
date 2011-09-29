@@ -26,16 +26,48 @@
 #define SOFA_COMPONENT_ODESOLVER_NEWOMNISOLVER_H
 
 //Sensable include
-#include <HD/hd.h>
-#include <HDU/hdu.h>
-#include <HDU/hduError.h>
-#include <HDU/hduVector.h>
+#include "HD/hd.h"
+#include "HDU/hdu.h"
+#include "HDU/hduError.h"
+#include "HDU/hduVector.h"
 #include <sofa/helper/LCPcalc.h>
 #include <sofa/defaulttype/SolidTypes.h>
+#include <sofa/defaulttype/RigidTypes.h>
+#include <sofa/defaulttype/Vec.h>
+#include <sofa/helper/Quater.h>
+
 
 #include <sofa/core/behavior/BaseController.h>
 #include <sofa/component/visualmodel/OglModel.h>
+#include <sofa/component/mapping/RigidMapping.h>
 #include <sofa/component/controller/Controller.h>
+#include <sofa/simulation/common/Node.h>
+#include <sofa/simulation/common/Simulation.h>
+#include <sofa/component/container/MechanicalObject.h>
+
+//truc du .cpp
+#include <sofa/core/ObjectFactory.h>
+//#include <sofa/core/objectmodel/OmniEvent.h>
+
+//force feedback
+//#include <sofa/component/controller/ForceFeedback.h>
+#include <sofa/component/controller/MechanicalStateForceFeedback.h>
+#include <sofa/component/controller/LCPForceFeedback.h>
+#include <sofa/component/controller/NullForceFeedbackT.h>
+
+#include <sofa/simulation/common/AnimateBeginEvent.h>
+#include <sofa/simulation/common/AnimateEndEvent.h>
+
+#include <sofa/simulation/common/Node.h>
+#include <cstring>
+
+#include <sofa/component/visualmodel/OglModel.h>
+#include <sofa/core/objectmodel/KeypressedEvent.h>
+#include <sofa/core/objectmodel/KeyreleasedEvent.h>
+#include <sofa/core/objectmodel/MouseEvent.h>
+#include <sofa/simulation/tree/GNode.h>
+
+#include <math.h>
 
 namespace sofa
 {
@@ -49,7 +81,6 @@ namespace controller
 {
 
 class ForceFeedback;
-
 
 using namespace sofa::defaulttype;
 using core::objectmodel::Data;
@@ -70,7 +101,15 @@ typedef struct
 
 typedef struct
 {
-    ForceFeedback* forceFeedback;
+    simulation::Node *node;
+    sofa::component::visualmodel::OglModel *visu;
+    sofa::component::mapping::RigidMapping< Rigid3dTypes , ExtVec3fTypes  > *mapping;
+
+} VisualComponent;
+
+typedef struct
+{
+    LCPForceFeedback<Rigid3dTypes>* forceFeedback;
     simulation::Node *context;
 
     sofa::defaulttype::SolidTypes<double>::Transform endOmni_H_virtualTool;
@@ -84,7 +123,14 @@ typedef struct
     DeviceData servoDeviceData;  // for the haptic loop
     DeviceData deviceData;		 // for the simulation loop
 
+    double currentForce[3];
+
 } OmniData;
+
+typedef struct
+{
+    vector<OmniData> omniData;
+} allOmniData;
 
 /**
 * Omni driver
@@ -94,6 +140,11 @@ class NewOmniDriver : public Controller
 
 public:
     SOFA_CLASS(NewOmniDriver, Controller);
+    typedef RigidTypes::VecCoord Coord;
+    typedef RigidTypes::VecCoord VecCoord;
+
+
+
     Data<double> scale;
     Data<double> forceScale;
     Data<Vec3d> positionBase;
@@ -102,8 +153,23 @@ public:
     Data<Quat> orientationTool;
     Data<bool> permanent;
     Data<bool> omniVisu;
+    Data< VecCoord > posDevice;
+    Data< VecCoord > posStylus;
+    Data< std::string > locDOF;
+    Data< std::string > deviceName;
+    Data< int > deviceIndex;
+    Data<Vec1d> openTool;
+    Data<double> maxTool;
+    Data<double> minTool;
+    Data<double> openSpeedTool;
+    Data<double> closeSpeedTool;
 
-    OmniData	data;
+    sofa::component::container::MechanicalObject<sofa::defaulttype::Rigid3dTypes> *DOFs;
+
+    bool initVisu;
+
+    OmniData data;
+    allOmniData allData;
 
     NewOmniDriver();
     virtual ~NewOmniDriver();
@@ -113,27 +179,45 @@ public:
     virtual void reset();
     void reinit();
 
-    int initDevice(OmniData& data);
+    int initDevice();
 
     void cleanup();
     virtual void draw();
 
-    void setForceFeedback(ForceFeedback* ff);
+    void setForceFeedback(LCPForceFeedback<Rigid3dTypes>* ff);
 
     void onKeyPressedEvent(core::objectmodel::KeypressedEvent *);
     void onKeyReleasedEvent(core::objectmodel::KeyreleasedEvent *);
+    void onAnimateBeginEvent();
 
     void setDataValue();
-    void reinitVisual();
+
+    //variable pour affichage graphique
+    simulation::Node *parent;
+    VisualComponent visualNode[10];
+    simulation::Node *nodePrincipal;
+    simulation::Node *nodeDOF;
+    sofa::component::container::MechanicalObject<sofa::defaulttype::Rigid3dTypes> *rigidDOF;
+    bool changeScale;
+    bool firstInit;
+    float oldScale;
+    bool visuActif;
+    bool isInitialized;
+    Vec3d positionBase_buf;
+    bool modX;
+    bool modY;
+    bool modZ;
+    bool modS;
+    bool axesActif;
+    double pi;
+    HDfloat angle1[3];
+    HDfloat angle2[3];
+    bool firstDevice;
+    //vector<NewOmniDriver*> autreOmniDriver;
 
 private:
     void handleEvent(core::objectmodel::Event *);
-    sofa::component::visualmodel::OglModel *visu_base, *visu_end;
     bool noDevice;
-
-    bool moveOmniBase;
-    Vec3d positionBase_buf;
-
 
 
 
